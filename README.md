@@ -39,10 +39,10 @@ This is fee collect contract.
 When users buy/sell GordoNFT on market place, the royalty will go to this contract
 ## VRFv2DirectFundingConsumer
 chainlink random number generator, which random numbers will be used to select 40 NFTs to make the inactive in each round.
-callbackGasLimit : this value can be changed in live version deployment.
+    callbackGasLimit : this value can be changed in live version deployment.
 ## Lottery
 This is main contract of this project, which run lottery by chainlink custom upkeeper
 there are 2 functions 
-checkUpkeep : check running condition
-performUpkeep : run in each 1 hours by chainlink automation
+    checkUpkeep : check running condition
+    performUpkeep : run in each 1 hours by chainlink automation
 
