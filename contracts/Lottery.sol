@@ -19,6 +19,11 @@ contract Lottery is AutomationCompatibleInterface, Ownable {
     uint256 public requestId_;
     // events
     event RequestNumbers(uint256 lotteryId, uint256 requestId_);
+    event WinnerUpdated(
+        uint256 lotteryId,
+        uint256[] winners,
+        uint256 timestamp
+    );
     // Storing of the randomness generator
     address public randomGenerator_;
     address public vault_;
@@ -134,10 +139,12 @@ contract Lottery is AutomationCompatibleInterface, Ownable {
                 );
                 // setWinner,
                 for (uint256 i = 0; i < WinnersNumber; i++) {
-                    uint256 _tokenId = tokenIds[i];
+                    uint256 _tokenId = tokenIds[i] == 0 ? i + 1 : tokenIds[i];
                     winners[i] = _tokenId;
                     tokenStatus[_tokenId] = !tokenStatus[_tokenId];
                 }
+                // TODO : emit winner event
+                emit WinnerUpdated(lotteryId, winners, block.timestamp);
                 // resetRound
                 if (vault_ != address(0)) IVault(vault_).setWinners(winners);
                 if (nft_ != address(0))
@@ -172,6 +179,39 @@ contract Lottery is AutomationCompatibleInterface, Ownable {
         }
     }
 
+    function getMultipleTokenStatus(uint256[] memory _tokenIds)
+        public
+        view
+        returns (bool[] memory result)
+    {
+        result = new bool[](_tokenIds.length);
+        for (uint256 i = 0; i < _tokenIds.length; i++) {
+            result[i] = getTokenStatus(_tokenIds[i]);
+        }
+    }
+
+    function getTokenIds(uint256[] memory indexs)
+        public
+        view
+        returns (uint256[] memory result)
+    {
+        result = new uint256[](indexs.length);
+        for (uint256 i = 0; i < indexs.length; i++) {
+            result[i] = tokenIds[indexs[i]];
+        }
+    }
+
+    function GetTokenStatusByIndex(uint256[] memory indexs)
+        public
+        view
+        returns (bool[] memory result)
+    {
+        result = new bool[](indexs.length);
+        for (uint256 i = 0; i < indexs.length; i++) {
+            result[i] = getTokenStatus(tokenIds[indexs[i]]);
+        }
+    }
+
     function isWinner(uint256 tokenId) public view returns (bool) {
         for (uint256 i = 0; i < WinnersNumber; i++) {
             if (winners[i] == tokenId) {
@@ -179,5 +219,9 @@ contract Lottery is AutomationCompatibleInterface, Ownable {
             }
         }
         return false;
+    }
+
+    function getWinners() public view returns (uint256[] memory result) {
+        return winners;
     }
 }

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -35,6 +36,7 @@ contract GordoVault is Ownable {
     constructor(address _teamAddr, address _swapper) {
         teamPercent = 333333; // 33.3333%
         teamAddress = _teamAddr;
+        require(_teamAddr != address(0), "invalid team address");
         swapper = _swapper;
     }
 
@@ -43,7 +45,7 @@ contract GordoVault is Ownable {
         // set new winners
         delete winners;
         for (uint256 i = 0; i < _winners.length; i++) {
-            winners.push(_winners[1]);
+            winners.push(_winners[i]);
         }
     }
 
@@ -55,7 +57,7 @@ contract GordoVault is Ownable {
                 address[] memory path = new address[](2);
                 path[0] = WETH;
                 path[1] = WMATIC;
-                uint256[] memory amounts = ISwapper(swapper).getAmountsIn(
+                uint256[] memory amounts = ISwapper(swapper).getAmountsOut(
                     _amount,
                     path
                 );
@@ -84,7 +86,10 @@ contract GordoVault is Ownable {
                     }
                     if (nft != address(0) && winners[i] > 0) {
                         address receiver = IERC721(nft).ownerOf(winners[i]);
-                        if (receiver != address(0)) {
+                        if (
+                            receiver != address(0) &&
+                            !Address.isContract(receiver)
+                        ) {
                             TransferHelper.safeTransferETH(receiver, amount);
                         }
                     }
