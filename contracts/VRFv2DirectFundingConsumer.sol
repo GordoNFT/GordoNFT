@@ -142,4 +142,12 @@ contract VRFv2DirectFundingConsumer is
             "Unable to transfer"
         );
     }
+
+    function updateParameters(uint32 _newGasLimit, uint32 _numWords)
+        public
+        onlyOwner
+    {
+        callbackGasLimit = _newGasLimit;
+        numWords = _numWords;
+    }
 }
