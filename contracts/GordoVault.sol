@@ -9,6 +9,9 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "./libraries/TransferHelper.sol";
 import "./interface/ISwapper.sol";
 import "./interface/IWETH.sol";
+import "./interface/AggregatorV3Interface.sol";
+
+// MATIC/ETH price oracle 0x327e23A4855b6F663a28c5161541d69Af8973302
 
 contract GordoVault is Ownable {
     using SafeMath for uint256;
@@ -23,11 +26,14 @@ contract GordoVault is Ownable {
     address public nft;
     address public swapper;
     uint256 public minAmount;
+    address public priceOracle;
+    uint256 public slippage;
+    uint256 constant MAX_SLIPPAGE = 10000;
     event TeamAccountChanged(address teamAddress, uint256 teamPercent);
     event AddressChanged(address lottery, address nft);
     event MinAmountChanged(uint256 minAmount);
     event SwapperChanged(address swapper);
-
+    event PriceOracleAndSlippageUpdated(address priceOracle, uint256 slippage);
     modifier onlyLottery() {
         require(msg.sender == lottery, "Only Lottery can call function");
         _;
@@ -38,6 +44,8 @@ contract GordoVault is Ownable {
         teamAddress = _teamAddr;
         require(_teamAddr != address(0), "invalid team address");
         swapper = _swapper;
+        priceOracle = 0x327e23A4855b6F663a28c5161541d69Af8973302; // MATIC / ETH price oracle
+        slippage = 100; //1%
     }
 
     function setWinners(uint256[] memory _winners) public onlyLottery {
@@ -47,6 +55,30 @@ contract GordoVault is Ownable {
         for (uint256 i = 0; i < _winners.length; i++) {
             winners.push(_winners[i]);
         }
+    }
+
+    function getMinimumAmount(uint256 ethAmount)
+        public
+        view
+        returns (uint256 maticAmount)
+    {
+        uint80 roundID;
+        int256 price;
+        uint256 startedAt;
+        uint256 timeStamp;
+        uint80 answeredInRound;
+        (
+            roundID,
+            price,
+            startedAt,
+            timeStamp,
+            answeredInRound
+        ) = AggregatorV3Interface(priceOracle).latestRoundData();
+        uint8 decimals = AggregatorV3Interface(priceOracle).decimals();
+        maticAmount = ethAmount.mul(10**decimals).div(uint256(price));
+        maticAmount = maticAmount.mul(MAX_SLIPPAGE - slippage).div(
+            MAX_SLIPPAGE
+        );
     }
 
     function sendRewards() public onlyLottery {
@@ -61,6 +93,7 @@ contract GordoVault is Ownable {
                     _amount,
                     path
                 );
+                uint256 minMaticeAmount = getMinimumAmount(_amount);
                 TransferHelper.safeTransfer(
                     WETH,
                     ISwapper(swapper).GetReceiverAddress(path),
@@ -68,6 +101,7 @@ contract GordoVault is Ownable {
                 );
                 ISwapper(swapper)._swap(amounts, path, address(this));
                 _amount = IERC20(WMATIC).balanceOf(address(this));
+                require(_amount >= minMaticeAmount); // check slippage using price oracle
                 IWETH(WMATIC).withdraw(_amount);
             }
         }
@@ -117,7 +151,7 @@ contract GordoVault is Ownable {
         emit AddressChanged(lottery, nft);
     }
 
-    function setMinAMount(uint256 _minAmount) public onlyOwner {
+    function setMinAmount(uint256 _minAmount) public onlyOwner {
         minAmount = _minAmount;
         emit MinAmountChanged(minAmount);
     }
@@ -125,6 +159,16 @@ contract GordoVault is Ownable {
     function setSwapper(address _swapper) public onlyOwner {
         swapper = _swapper;
         emit SwapperChanged(swapper);
+    }
+
+    function setPriceOracleAndSlippage(address _priceOracle, uint256 _slippage)
+        public
+        onlyOwner
+    {
+        priceOracle = _priceOracle;
+        slippage = _slippage;
+        require(slippage <= MAX_SLIPPAGE, "slippage over flow");
+        emit PriceOracleAndSlippageUpdated(priceOracle, slippage);
     }
 
     /**
